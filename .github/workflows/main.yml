@@ -1,0 +1,41 @@
+name: Build FRIDAY APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip project if it was uploaded as a zip
+        run: |
+          if [ -f friday-assistant.zip ] && [ ! -f settings.gradle.kts ]; then
+            unzip -o friday-assistant.zip
+          fi
+          if [ -d friday-assistant ] && [ -f friday-assistant/settings.gradle.kts ]; then
+            echo "PROJECT_DIR=friday-assistant" >> "$GITHUB_ENV"
+          else
+            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
+          fi
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 35 packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle assembleDebug --stacktrace
+      - name: Upload FRIDAY APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FRIDAY-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          
