@@ -7,10 +7,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unzip project if it was uploaded as a zip
+      - name: Unzip project zip
         run: |
-          if [ -f friday-assistant.zip ] && [ ! -f settings.gradle.kts ]; then
-            unzip -o friday-assistant.zip
+          ZIP=$(ls *.zip 2>/dev/null | head -1)
+          if [ -n "$ZIP" ] && [ ! -f settings.gradle.kts ]; then
+            unzip -o "$ZIP"
           fi
           if [ -d friday-assistant ] && [ -f friday-assistant/settings.gradle.kts ]; then
             echo "PROJECT_DIR=friday-assistant" >> "$GITHUB_ENV"
@@ -22,10 +23,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
       - name: Install Android SDK 35 packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Set up Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
