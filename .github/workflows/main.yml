@@ -5,6 +5,9 @@ name: Build Vaani APK
 #   - Build ke baad khud GitHub Release banata hai + update.json update karta hai
 #   - Phone har 6 ghante mein update.json check karke khud update ho jata hai
 # Secrets na hon to debug APK banta hai (phir har update par uninstall karna padega).
+# FIX (v5.16.1): android-actions/setup-android@v3 runner par fail ho raha tha
+# (ChildProcess error) — isliye purana sdkmanager wala tareeka wapas laya gaya hai,
+# jo isi repo par subah ke successful builds mein chal raha tha.
 # Repo root mein zip file honi chahiye (jaise Vaani_v5.16.zip) — workflow use unzip karke banata hai.
 
 permissions:
@@ -41,8 +44,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 34 packages
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: Decode release keystore (GitHub secrets)
         if: env.ANDROID_KEYSTORE_BASE64 != ''
