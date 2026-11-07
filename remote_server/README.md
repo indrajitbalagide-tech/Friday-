@@ -34,7 +34,7 @@ Vaani -> Settings -> REMOTE ACCESS:
 Check: Vaani mein "brain status" bolo, "Remote access: juda hai" dikhna chahiye. Website par upar "Phone online" hara dikhega.
 
 ## Website
-`https://<aapka-url>` kholo -> password -> chat box. Mic button bolkar bhejta hai (Chrome/Edge/Safari). "Awaaz" button jawab bolkar sunata hai. Risky kaam (payment, delete, send) par Vaani pehle poochhegi, aap "haan" bhejo.
+`https://<aapka-url>` kholo -> password -> chat box. Mic button bolkar bhejta hai (Chrome/Edge/Safari). "Awaaz" button jawab bolkar sunata hai — v5.33 se Gemini ki awaaz (Aoede) mein; audio na mile to browser ki robotic voice fallback. Risky kaam (payment, delete, send) par Vaani pehle poochhegi, aap "haan" bhejo.
 
 ## Security
 - Session cookie HttpOnly + SameSite=Strict, galat password 5 baar par 15 minute block.
