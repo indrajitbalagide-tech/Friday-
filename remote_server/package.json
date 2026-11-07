@@ -1,9 +1,0 @@
-{
-  "name": "vaani-remote-server",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Vaani phone ko internet se kahin se bhi control karne ka private server + website",
-  "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "engines": { "node": ">=18" }
-}
