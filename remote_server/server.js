@@ -25,9 +25,10 @@ const INDEX = fs.readFileSync(path.join(__dirname, "public", "index.html"));
 const SESSION_MS = 30 * 24 * 3600 * 1000;
 const LONG_POLL_MS = 25000;
 const ONLINE_MS = 45000;
-const MAX_BODY = 20000;
+const MAX_BODY = 1000000;   // v5.33: website Gemini voice audio (base64 WAV) ke liye 1MB — pehle 20KB tha
 const MAX_TEXT = 2000;
 const HISTORY_MAX = 300;
+const AUDIO_TTL_MS = 120000;   // v5.33: audio ek baar download hone ya 2 minute baad khatm
 
 // ---------- helpers ----------
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest();
@@ -88,19 +89,23 @@ function readJson(req) {
 let seq = 0;
 const history = [];
 const queue = [];
+const audioBySeq = new Map();   // v5.33: seq -> { data: base64 WAV, ts } — ek baar download ya 2 min baad khatm
 let lastSeen = 0;
 const webWaiters = new Set();
 let deviceWaiter = null;
 const online = () => Date.now() - lastSeen < ONLINE_MS;
 
-function addMsg(role, text) {
+function addMsg(role, text, audio) {
   seq++;
-  history.push({ n: seq, role, text: String(text).slice(0, 8000), ts: Date.now() });
+  const item = { n: seq, role, text: String(text).slice(0, 8000), ts: Date.now() };
+  if (audio) item.audio = true;   // v5.33: audio data yahan nahi — sirf flag; data /api/audio se ek baar milta hai
+  history.push(item);
   if (history.length > HISTORY_MAX) history.shift();
   for (const w of [...webWaiters]) {
     const items = history.filter((m) => m.n > w.since);
     if (items.length) { clearTimeout(w.timer); webWaiters.delete(w); send(w.res, 200, { items, seq, online: online() }); }
   }
+  return seq;
 }
 function deliverToDevice() {
   if (deviceWaiter && queue.length) {
@@ -114,7 +119,7 @@ const fails = new Map();
 function clientIp(req) { return ((req.headers["x-forwarded-for"] || "").split(",")[0] || req.socket.remoteAddress || "?").trim(); }
 function blocked(ip) { const f = fails.get(ip); return f && f.n >= 5 && Date.now() - f.t < 15 * 60 * 1000; }
 function noteFail(ip) { const f = fails.get(ip); if (!f || Date.now() - f.t > 15 * 60 * 1000) fails.set(ip, { n: 1, t: Date.now() }); else { f.n++; f.t = Date.now(); } }
-setInterval(() => { const now = Date.now(); for (const [k, v] of fails) if (now - v.t > 15 * 60 * 1000) fails.delete(k); }, 600000).unref();
+setInterval(() => { const now = Date.now(); for (const [k, v] of fails) if (now - v.t > 15 * 60 * 1000) fails.delete(k); for (const [k, v] of audioBySeq) if (now - v.ts > AUDIO_TTL_MS) audioBySeq.delete(k); }, 600000).unref();
 
 // ---------- routes ----------
 const server = http.createServer(async (req, res) => {
@@ -162,6 +167,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (p === "/api/clear" && req.method === "POST") { history.length = 0; queue.length = 0; return send(res, 200, { ok: true, seq }); }
+      // v5.33 — Gemini voice audio: browser ek baar download karta hai, phir khatm (nahi mila to robotic fallback).
+      if (p === "/api/audio" && req.method === "GET") {
+        const n = Number(url.searchParams.get("n")) || 0;
+        const a = audioBySeq.get(n);
+        if (!a) return send(res, 404, { error: "nahi mila" });
+        audioBySeq.delete(n);
+        return send(res, 200, { audio: a.data, mime: "audio/wav" });
+      }
       return send(res, 404, { error: "nahi mila" });
     }
 
@@ -180,7 +193,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === "/device/reply" && req.method === "POST") {
         const b = await readJson(req);
-        addMsg("vaani", String(b.text || "Ho gaya."));
+        // v5.33: phone Gemini TTS audio (base64 WAV) bhej sakta hai — history mein sirf flag, data alag map mein.
+        const hasAudio = typeof b.audio === "string" && b.audio.length > 0;
+        const n = addMsg("vaani", String(b.text || "Ho gaya."), hasAudio);
+        if (hasAudio) audioBySeq.set(n, { data: String(b.audio).slice(0, 900000), ts: Date.now() });
         return send(res, 200, { ok: true });
       }
       return send(res, 404, { error: "nahi mila" });
