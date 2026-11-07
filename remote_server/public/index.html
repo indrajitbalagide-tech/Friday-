@@ -90,6 +90,29 @@
     $("stt").textContent = on ? "Phone online" : "Phone offline";
   }
 
+  // v5.33 — Robotic voice (browser speechSynthesis) sirf fallback hai.
+  function speakRobot(text) {
+    if (!window.speechSynthesis) return;
+    try { var u = new SpeechSynthesisUtterance(text); u.lang = "hi-IN"; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+  }
+
+  // v5.33 — Gemini voice: phone ne reply ke saath audio bheja ho to wahi bajao, nahi to robotic.
+  function playB64Wav(b64) {
+    var bin = atob(b64); var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+    var a = new Audio(url);
+    a.onended = function () { URL.revokeObjectURL(url); };
+    return a.play();
+  }
+  function speakGemini(m) {
+    api("/api/audio?n=" + m.n).then(function (r) {
+      if (r.status === 200 && r.data && r.data.audio) {
+        playB64Wav(r.data.audio).catch(function () { speakRobot(m.text); });
+      } else speakRobot(m.text);
+    }).catch(function () { speakRobot(m.text); });
+  }
+
   function add(m) {
     var d = document.createElement("div");
     d.className = "m " + m.role;
@@ -98,8 +121,8 @@
     var atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
     log.appendChild(d);
     if (atBottom || m.role === "user") log.scrollTop = log.scrollHeight;
-    if (!first && m.role === "vaani" && speak && window.speechSynthesis) {
-      try { var u = new SpeechSynthesisUtterance(m.text); u.lang = "hi-IN"; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+    if (!first && m.role === "vaani" && speak) {
+      if (m.audio) speakGemini(m); else speakRobot(m.text);
     }
   }
 
